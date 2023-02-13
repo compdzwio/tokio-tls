@@ -1,0 +1,30 @@
+[package]
+authors = ["ChiHai <ihciah@gmail.com>"]
+categories = ["asynchronous", "cryptography", "network-programming"]
+description = "Asynchronous TLS streams wrapper for Tokio based on Rustls."
+edition = "2021"
+homepage = "https://github.com/compdzwio/tokio-tls"
+license = "MIT/Apache-2.0"
+name = "tokio-rustls-fork-shadow-tls"
+readme = "README.md"
+repository = "https://github.com/compdzwio/tokio-tls"
+version = "0.0.8-mod.4"
+
+[dependencies]
+bytes = {version = "1"}
+tokio = {version = "1.25.0", features = ["full"]}
+rustls-fork-shadow-tls = {version = "0.20.9-mod.2", default-features = false}
+thiserror = {version = "1"}
+
+[features]
+dangerous_configuration = ["rustls-fork-shadow-tls/dangerous_configuration"]
+default = ["logging", "tls12"]
+logging = ["rustls-fork-shadow-tls/logging"]
+tls12 = ["rustls-fork-shadow-tls/tls12"]
+# Once unsafe_io is enabled, you may not drop the future before it returns ready.
+# It saves one buffer copy than disabled.
+unsafe_io = []
+
+[dev-dependencies]
+tokio = {version = "1.25.0"}
+webpki-roots = "0.22"

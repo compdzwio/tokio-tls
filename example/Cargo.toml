@@ -1,0 +1,20 @@
+[package]
+edition = "2021"
+name = "tokio-tls-example"
+version = "0.1.0"
+
+[dependencies]
+tokio = {version = "1.25.0"}
+rustls-pemfile = "1"
+webpki-roots = "0.22"
+
+tokio-rustls-fork-shadow-tls = {version = "0.0.8-mod.4", path = "../tokio-rustls", features = ["tls12"]}
+rustls-fork-shadow-tls = {version = "0.20.9-mod.2", features = ["tls12"]}
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
