@@ -1,4 +1,6 @@
-use std::{fmt::Debug, hint::unreachable_unchecked, io};
+use std::{
+    fmt::Debug, hint::unreachable_unchecked, io
+};
 
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt}

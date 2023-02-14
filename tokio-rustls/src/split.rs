@@ -13,8 +13,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use tokio::pin;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::{
+    pin,
+    io::{AsyncRead, AsyncWrite, ReadBuf}
+};
 
 use rustls_fork_shadow_tls::{ConnectionCommon, SideData};
 
@@ -43,7 +45,7 @@ where
         let inner = unsafe { &mut *self.inner.get() };
         let ex = inner.read_inner(buf, true);
         pin!(ex);
-        return ex.poll(cx);
+        ex.poll(cx)
     }
 }
 

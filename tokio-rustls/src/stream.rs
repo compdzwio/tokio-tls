@@ -1,15 +1,17 @@
 use std::{
     cell::UnsafeCell,
     future::Future,
-    io::{IoSlice, self, Read, Write},
+    io::{IoSlice, Read, self, Write},
     ops::{Deref, DerefMut},
     pin::Pin,
     rc::Rc,
     task::{Context, Poll},
 };
 
-use tokio::pin;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::{
+    pin,
+    io::{AsyncRead, AsyncWrite, ReadBuf}
+};
 
 use rustls_fork_shadow_tls::{ConnectionCommon, SideData};
 
@@ -144,7 +146,7 @@ where
                 (_, false) => {
                     break;
                 }
-            };
+            }
         }
 
         // flush buffer
@@ -192,7 +194,7 @@ where
                 Err(e) => {
                     return Err(e);
                 }
-            };
+            }
         }
     }
 }
@@ -208,8 +210,7 @@ where
     ) -> Poll<std::io::Result<()>> {
         let ex = self.read_inner(buf, false);
         pin!(ex);
-        let result = ex.poll(cx);
-        return result;
+        ex.poll(cx)
     }
 }
 
