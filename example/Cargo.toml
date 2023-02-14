@@ -8,8 +8,8 @@ tokio = {version = "1.25.0"}
 rustls-pemfile = "1"
 webpki-roots = "0.22"
 
-tokio-rustls-fork-shadow-tls = {version = "0.0.8-mod.4", path = "../tokio-rustls", features = ["tls12"]}
-rustls-fork-shadow-tls = {version = "0.20.9-mod.2", features = ["tls12"]}
+tokio-rustls-fork-shadow-tls = {version = "0.0.8", path = "../tokio-rustls", features = ["tls12"]}
+rustls-fork-shadow-tls = {version = "0.20.8", features = ["tls12"]}
 
 [[bin]]
 name = "server"
