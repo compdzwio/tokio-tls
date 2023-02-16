@@ -177,7 +177,7 @@ impl SafeWrite {
         let result = io.write_all(buf).await;
         match result {
             Ok(_) => {
-                let n = buffer.write - buffer.read;
+                let n = buf.len();
                 buffer.advance(n);
                 Ok(n)
             }

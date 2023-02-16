@@ -18,6 +18,12 @@ use rustls_fork_shadow_tls::{ConnectionCommon, SideData};
 use crate::split::{ReadHalf, WriteHalf};
 
 #[derive(Debug)]
+enum WriteStatus {
+    Ok,
+    Pending(usize)
+}
+
+#[derive(Debug)]
 pub struct Stream<IO, C> {
     pub(crate) io: IO,
     pub(crate) session: C,
@@ -29,6 +35,9 @@ pub struct Stream<IO, C> {
     r_buffer: crate::unsafe_io::UnsafeRead,
     #[cfg(feature = "unsafe_io")]
     w_buffer: crate::unsafe_io::UnsafeWrite,
+    write_status: WriteStatus,
+    flush_status: WriteStatus,
+    close_status: WriteStatus,
 }
 
 impl<IO, C> Stream<IO, C> {
@@ -38,6 +47,9 @@ impl<IO, C> Stream<IO, C> {
             session,
             r_buffer: Default::default(),
             w_buffer: Default::default(),
+            write_status: WriteStatus::Ok,
+            flush_status: WriteStatus::Ok,
+            close_status: WriteStatus::Ok,
         }
     }
 
@@ -51,7 +63,7 @@ impl<IO, C> Stream<IO, C> {
         )
     }
 
-    pub fn into_parts(self) -> (IO, C) {
+    pub fn into_inner(self) -> (IO, C) {
         (self.io, self.session)
     }
 }
@@ -208,9 +220,9 @@ where
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>
     ) -> Poll<std::io::Result<()>> {
-        let ex = self.read_inner(buf, false);
-        pin!(ex);
-        ex.poll(cx)
+        let read = self.read_inner(buf, false);
+        pin!(read);
+        read.poll(cx)
     }
 }
 
@@ -224,25 +236,36 @@ where
         buf: &[u8]
     ) -> Poll<std::io::Result<usize>> {
         // write buf to rustls
-        let n = match self.session.writer().write(buf) {
-            Ok(n) => n,
-            Err(e) => return Poll::Ready(Err(e)),
-        };
+        if let WriteStatus::Ok = self.write_status {
+            let n = match self.session.writer().write(buf) {
+                Ok(n) => n,
+                Err(e) => return Poll::Ready(Err(e)),
+            };
+            self.write_status = WriteStatus::Pending(n);
+        }
 
         // write from rustls to connection
         while self.session.wants_write() {
-            let ex = self.write_io();
-            pin!(ex);
-            match ex.poll(cx) {
+            let write = self.write_io();
+            pin!(write);
+            match write.poll(cx) {
                 Poll::Ready(Ok(0)) => {
                     break;
                 }
                 Poll::Ready(Ok(_)) => (),
-                Poll::Pending => return Poll::Pending,
+                Poll::Pending => {
+                    return Poll::Pending;
+                }
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
             }
         }
-        Poll::Ready(Ok(n))
+
+        let n = match self.write_status {
+            WriteStatus::Ok => 0,
+            WriteStatus::Pending(n) => n,
+        };
+        self.write_status = WriteStatus::Ok;
+        return Poll::Ready(Ok(n));
     }
 
     fn poll_write_vectored(
@@ -261,34 +284,54 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>
     ) -> Poll<std::io::Result<()>> {
-        self.session.writer().flush()?;
+        if let WriteStatus::Ok = self.flush_status {
+            self.session.writer().flush()?;
+            self.flush_status = WriteStatus::Pending(0);
+        }
         while self.session.wants_write() {
-            let ex = self.write_io();
-            pin!(ex);
-            match ex.poll(cx) {
+            let write = self.write_io();
+            pin!(write);
+            match write.poll(cx) {
                 Poll::Ready(Ok(_)) => (),
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
             }
         }
-        Pin::new(&mut self.io).poll_flush(cx)
+        let result = Pin::new(&mut self.io).poll_flush(cx);
+        match result {
+            Poll::Ready(Ok(_)) => (),
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(Err(_)) => (),
+        }
+        self.flush_status = WriteStatus::Ok;
+        return result;
     }
 
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>
     ) -> Poll<std::io::Result<()>> {
-        self.session.send_close_notify();
+        if let WriteStatus::Ok = self.close_status {
+            self.session.send_close_notify();
+            self.close_status = WriteStatus::Pending(0);
+        }
         while self.session.wants_write() {
-            let ex = self.write_io();
-            pin!(ex);
-            match ex.poll(cx) {
+            let write = self.write_io();
+            pin!(write);
+            match write.poll(cx) {
                 Poll::Ready(Ok(_)) => (),
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
             }
         }
-        Pin::new(&mut self.io).poll_shutdown(cx)
+        let result = Pin::new(&mut self.io).poll_shutdown(cx);
+        match result {
+            Poll::Ready(Ok(_)) => (),
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(Err(_)) => (),
+        }
+        self.close_status = WriteStatus::Ok;
+        return result;
     }
 
     fn is_write_vectored(&self) -> bool {
