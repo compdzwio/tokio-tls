@@ -27,4 +27,4 @@ unsafe_io = []
 
 [dev-dependencies]
 tokio = {version = "1.25.0"}
-webpki-roots = "0.22"
+webpki-roots = "1.0.10"
